@@ -1,0 +1,16 @@
+set(SDP_NATIVE_ARCHIVE "$ENV{SDP_NATIVE_ARCHIVE}" CACHE FILEPATH "StarDataParadiseDLLler 0.1.0 Windows x64 ZIP")
+set(SDP_NATIVE_SHA256 "9a9e7409c3670e38c1a54bca1bcdc2b9cf9e3f68c87286500c745bdbea1cfd4c")
+if(NOT EXISTS "${SDP_NATIVE_ARCHIVE}")
+    message(FATAL_ERROR "Provide the native SDK ZIP with -DSDP_NATIVE_ARCHIVE=<file>.")
+endif()
+file(SHA256 "${SDP_NATIVE_ARCHIVE}" native_digest)
+if(NOT native_digest STREQUAL SDP_NATIVE_SHA256)
+    message(FATAL_ERROR "Native SDK SHA-256 mismatch.")
+endif()
+set(native_root "${CMAKE_CURRENT_BINARY_DIR}/_deps/native-0.1.0")
+file(MAKE_DIRECTORY "${native_root}")
+file(ARCHIVE_EXTRACT INPUT "${SDP_NATIVE_ARCHIVE}" DESTINATION "${native_root}")
+find_package(StarDataParadiseDLLler 0.1.0 EXACT REQUIRED CONFIG
+    PATHS "${native_root}" NO_DEFAULT_PATH)
+set_target_properties(StarDataParadise::StarDataParadiseDLLler PROPERTIES
+    MAP_IMPORTED_CONFIG_DEBUG Release)
