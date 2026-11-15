@@ -15,6 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="automation.cpp"><Filter>Fichiers sources</Filter></ClCompile>
+    <ClCompile Include="output.cpp"><Filter>Fichiers sources</Filter></ClCompile>
+    <ClCompile Include="..\automation\sql_script.cpp"><Filter>Fichiers sources</Filter></ClCompile>
     <ClCompile Include="connection.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
@@ -24,5 +27,11 @@
     <ClCompile Include="StarDataParadiseCli.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="automation.hpp"><Filter>Fichiers d%27en-tête</Filter></ClInclude>
+    <ClInclude Include="connection.hpp"><Filter>Fichiers d%27en-tête</Filter></ClInclude>
+    <ClInclude Include="terminal.hpp"><Filter>Fichiers d%27en-tête</Filter></ClInclude>
+    <ClInclude Include="..\automation\sql_script.hpp"><Filter>Fichiers d%27en-tête</Filter></ClInclude>
   </ItemGroup>
 </Project>

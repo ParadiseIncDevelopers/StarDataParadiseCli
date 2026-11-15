@@ -14,15 +14,26 @@
 
 namespace cli
 {
-namespace
-{
-using namespace std::chrono_literals;
-using Clock = std::chrono::steady_clock;
-
 sdp_text text(std::string_view value)
 {
     return {value.data(), static_cast<uint32_t>(value.size())};
 }
+
+std::string_view Buffer::bytes() const
+{
+    if (!value.data || !value.size) return {};
+    return {reinterpret_cast<const char*>(value.data), value.size};
+}
+
+Json Buffer::json() const
+{
+    return Json::parse(bytes());
+}
+
+namespace
+{
+using namespace std::chrono_literals;
+using Clock = std::chrono::steady_clock;
 
 class Winsock
 {
@@ -99,11 +110,6 @@ uint32_t profile_number(const Json& value, uint32_t low, uint32_t high)
     return value.get<uint32_t>();
 }
 
-struct Buffer
-{
-    sdp_buffer value{};
-    ~Buffer() { sdp_buffer_free(&value); }
-};
 }
 
 uint32_t number(std::string_view text, uint32_t low, uint32_t high)
@@ -140,6 +146,7 @@ Profile read_profile(const std::filesystem::path& path)
         else if (key == "user") profile.user = profile_value(value, 64);
         else if (key == "tls_name") profile.tls_name = profile_value(value, 253);
         else if (key == "timeout_ms") profile.timeout = profile_number(value, 100, 120000);
+        else if (key == "production" && value.is_boolean()) profile.production = value.get<bool>();
         else if (key == "ca_file")
         {
             const auto ca = std::filesystem::path(wide(profile_value(value, 32768)));
@@ -150,7 +157,7 @@ Profile read_profile(const std::filesystem::path& path)
     return profile;
 }
 
-Exit exit_for(const sdp_error& error)
+Exit exit_for(const sdp_error& error, bool sql)
 {
     if (error.unknown_outcome) return Exit::unknown;
     switch (error.code)
@@ -158,9 +165,12 @@ Exit exit_for(const sdp_error& error)
     case SDP_OK: return Exit::ok;
     case SDP_AUTH_FAILED:
     case SDP_PERMISSION_DENIED: return Exit::auth;
-    case SDP_INVALID_ARGUMENT: return Exit::arguments;
+    case SDP_INVALID_ARGUMENT: return sql ? Exit::sql : Exit::arguments;
     case SDP_CANCELLED: return Exit::cancelled;
-    case SDP_FEATURE_UNSUPPORTED: return Exit::sql;
+    case SDP_FEATURE_UNSUPPORTED:
+    case SDP_INVALID_STATE:
+    case SDP_MODULE_UNAVAILABLE:
+    case SDP_RESOURCE_LIMIT: return Exit::sql;
     default: return Exit::connection;
     }
 }
@@ -230,7 +240,15 @@ sdp_error Connection::open(const Profile& profile, std::string_view password, co
                 std::ranges::all_of(features, [](const Json& feature) { return feature.is_boolean(); }))
             {
                 features_ = std::move(features);
-                return {};
+                Buffer identity;
+                if (sdp_get_session_info(handle_, &identity.value, &error) == SDP_OK)
+                {
+                    session_ = Json::parse(identity.bytes(), nullptr, false);
+                    if (session_.is_object() && session_.contains("session_id")) return {};
+                    error = error_for(SDP_MALFORMED_MESSAGE, "Invalid session info received");
+                }
+                close();
+                return error;
             }
         }
         error = error_for(SDP_MALFORMED_MESSAGE, "Invalid capabilities received");
@@ -241,11 +259,17 @@ sdp_error Connection::open(const Profile& profile, std::string_view password, co
 
 sdp_error Connection::health(const Terminal& terminal)
 {
+    return request(terminal, sdp_health);
+}
+
+sdp_error Connection::request(const Terminal& terminal, const Request& operation)
+{
     if (!connected()) return error_for(SDP_CONNECTION_LOST, "Disconnected");
+    if (terminal.interrupted()) return error_for(SDP_CANCELLED, "Operation cancelled");
     const auto handle = handle_;
-    auto pending = std::async(std::launch::async, [handle] {
+    auto pending = std::async(std::launch::async, [&operation, handle] {
         sdp_error error{};
-        sdp_health(handle, &error);
+        error.code = operation(handle, &error);
         return error;
     });
     while (pending.wait_for(25ms) == std::future_status::timeout)
@@ -253,8 +277,8 @@ sdp_error Connection::health(const Terminal& terminal)
         if (terminal.interrupted()) sdp_cancel(handle, nullptr);
     }
     auto error = pending.get();
-    if (terminal.interrupted()) error = error_for(SDP_CANCELLED, "Operation cancelled");
-    if (error.code != SDP_OK) close();
+    if (error.unknown_outcome || error.code == SDP_CANCELLED || error.code == SDP_CONNECTION_LOST ||
+        error.code == SDP_TIMEOUT || error.code == SDP_MALFORMED_MESSAGE) close();
     return error;
 }
 
@@ -265,5 +289,7 @@ void Connection::close() noexcept
         sdp_close(handle_, nullptr);
         handle_ = 0;
     }
+    session_.clear();
+    features_.clear();
 }
 }

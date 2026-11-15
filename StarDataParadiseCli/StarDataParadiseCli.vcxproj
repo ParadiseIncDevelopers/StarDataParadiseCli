@@ -140,8 +140,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="StarDataParadiseCli.cpp" />
+    <ClCompile Include="automation.cpp" />
+    <ClCompile Include="output.cpp" />
+    <ClCompile Include="..\automation\sql_script.cpp" />
     <ClCompile Include="connection.cpp" />
     <ClCompile Include="terminal.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="automation.hpp" />
+    <ClInclude Include="connection.hpp" />
+    <ClInclude Include="terminal.hpp" />
+    <ClInclude Include="..\automation\sql_script.hpp" />
   </ItemGroup>
   <PropertyGroup>
     <SdpNativeDir>$(IntDir)sdp-native\</SdpNativeDir>
@@ -154,13 +163,13 @@
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(SdpNativeDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>StarDataParadiseDLLler.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>StarDataParadiseDLLler.lib;ws2_32.lib;bcrypt.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Target Name="RequireNativeSdk" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(Platform)'!='x64'" Text="The pinned SDK targets Windows x64." />
     <Error Condition="!Exists('$(SDP_NATIVE_ARCHIVE)') Or !Exists('$(SDP_JSON_ROOT)\include\nlohmann\json.hpp')" Text="Set SDP_NATIVE_ARCHIVE and SDP_JSON_ROOT. See BUILD.md." />
-    <VerifyFileHash File="$(SDP_NATIVE_ARCHIVE)" Hash="9a9e7409c3670e38c1a54bca1bcdc2b9cf9e3f68c87286500c745bdbea1cfd4c" />
+    <VerifyFileHash File="$(SDP_NATIVE_ARCHIVE)" Hash="4ee15b8fa50c94c5ee012245d8ed8e3c16259df64fc154ca15fb286cb6a8ad25" />
     <MakeDir Directories="$(SdpNativeDir)" />
     <Unzip SourceFiles="$(SDP_NATIVE_ARCHIVE)" DestinationFolder="$(SdpNativeDir)" />
   </Target>

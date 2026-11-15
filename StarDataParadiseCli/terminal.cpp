@@ -1,7 +1,9 @@
 #include "terminal.hpp"
 
 #include <array>
+#include <algorithm>
 #include <atomic>
+#include <cwctype>
 #include <iostream>
 #include <stdexcept>
 
@@ -107,11 +109,13 @@ void Terminal::set_color(Color mode, bool json)
     color_ = !console_output_ || SetConsoleMode(output_, saved_output_ | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 }
 
-void Terminal::prompt(bool connected) const
+void Terminal::prompt(bool connected, std::string_view detail) const
 {
-    if (!interactive()) return;
+    if (!interactive() || quiet_input_) return;
     if (color_) std::cout << (connected ? "\033[32m" : "\033[36m");
-    std::cout << (connected ? "sdp> " : "sdp(disconnected)> ");
+    if (detail == "continue") std::cout << "    -> ";
+    else if (connected) std::cout << "sdp(" << terminal_text(detail) << ")> ";
+    else std::cout << "sdp(disconnected)> ";
     if (color_) std::cout << "\033[0m";
     std::cout << std::flush;
 }
@@ -124,21 +128,34 @@ void Terminal::success(std::string_view message) const
     std::cout << std::endl;
 }
 
-Line Terminal::line(std::string& output, size_t limit, bool secret) const
+Line Terminal::line(std::string& output, size_t limit, bool secret, const std::vector<std::string>* history) const
 {
     output.clear();
     if (secret) output.reserve(limit + 1);
     if (interrupted()) return Line::cancelled;
-    if (console_input_) return console_line(output, limit, secret);
+    if (console_input_) return console_line(output, limit, secret, history);
     return redirected_line(output, limit);
 }
 
-Line Terminal::console_line(std::string& output, size_t limit, bool secret) const
+Line Terminal::console_line(std::string& output, size_t limit, bool secret, const std::vector<std::string>* history) const
 {
     ClearedArray<wchar_t, 4096> storage;
     std::array<HANDLE, 2> sources{interrupt_, input_};
     size_t size{};
     bool overflow{};
+    const bool echo = !secret && interactive() && !quiet_input_;
+    std::wstring search_prefix;
+    size_t history_pos = history ? history->size() : 0;
+    bool browsing = false;
+    const auto replace = [&](std::wstring_view next) {
+        if (next.size() >= storage.data.size()) return;
+        for (size_t index = 0; index < size; ++index) std::cout << "\b \b";
+        std::cout.flush();
+        std::ranges::copy(next, storage.data.begin());
+        size = next.size();
+        DWORD written{};
+        if (size) WriteConsoleW(output_, storage.data.data(), static_cast<DWORD>(size), &written, nullptr);
+    };
     while (true)
     {
         const auto wait = WaitForMultipleObjects(static_cast<DWORD>(sources.size()), sources.data(), FALSE, INFINITE);
@@ -149,10 +166,63 @@ Line Terminal::console_line(std::string& output, size_t limit, bool secret) cons
         DWORD count{};
         if (!ReadConsoleInputW(input_, &record, 1, &count)) return Line::failed;
         if (!count || record.EventType != KEY_EVENT || !record.Event.KeyEvent.bKeyDown) continue;
+        const auto key = record.Event.KeyEvent.wVirtualKeyCode;
         const auto c = record.Event.KeyEvent.uChar.UnicodeChar;
+        const std::wstring_view input(storage.data.data(), size);
+        if (echo && key == VK_TAB)
+        {
+            constexpr std::array commands{L"SELECT", L"INSERT", L"UPDATE", L"DELETE", L"CREATE", L"ALTER",
+                L"DROP", L"BEGIN", L"DECLARE", L"CALL", L"COMMIT", L"ROLLBACK", L"SAVEPOINT", L"EXPLAIN",
+                L"\\connect", L"\\status", L"\\capabilities", L"\\databases", L"\\tables", L"\\describe",
+                L"\\format", L"\\timing", L"\\run", L"\\history", L"\\rpc", L"\\outcome", L"\\service",
+                L"\\autocommit", L"\\begin", L"\\commit", L"\\rollback", L"\\savepoint", L"\\release",
+                L"\\sessions", L"\\password", L"\\help", L"\\quit"};
+            if (!input.empty() && input.find_first_of(L" \t") == input.npos)
+            {
+                for (const std::wstring_view command : commands)
+                {
+                    if (command.size() < input.size()) continue;
+                    if (!std::equal(input.begin(), input.end(), command.begin(), [](wchar_t a, wchar_t b) {
+                        return std::towupper(a) == std::towupper(b);
+                    })) continue;
+                    replace(std::wstring(command) + L" ");
+                    break;
+                }
+            }
+            continue;
+        }
+        const bool reverse_search = key == 'R' &&
+            (record.Event.KeyEvent.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) != 0;
+        if (echo && history && (key == VK_UP || key == VK_DOWN || reverse_search))
+        {
+            if (!browsing) { search_prefix = input; history_pos = history->size(); browsing = true; }
+            if (key == VK_UP || reverse_search)
+            {
+                for (size_t index = history_pos; index > 0; --index)
+                {
+                    const auto previous = wide(history->at(index - 1));
+                    if (!previous.starts_with(search_prefix)) continue;
+                    history_pos = index - 1;
+                    replace(previous);
+                    break;
+                }
+            }
+            else
+            {
+                for (size_t index = history_pos + 1; index <= history->size(); ++index)
+                {
+                    const auto next = index == history->size() ? search_prefix : wide(history->at(index));
+                    if (!next.starts_with(search_prefix)) continue;
+                    history_pos = index;
+                    replace(next);
+                    break;
+                }
+            }
+            continue;
+        }
         if (c == L'\r')
         {
-            if (!secret && interactive()) std::cout << '\n';
+            if (echo) std::cout << '\n';
             if (overflow) return Line::too_long;
             try { output = utf8({storage.data.data(), size}); }
             catch (const std::invalid_argument&) { return Line::failed; }
@@ -162,7 +232,8 @@ Line Terminal::console_line(std::string& output, size_t limit, bool secret) cons
         if (c == L'\b' && size > 0)
         {
             storage.data[--size] = L'\0';
-            if (!secret && interactive()) std::cout << "\b \b" << std::flush;
+            browsing = false;
+            if (echo) std::cout << "\b \b" << std::flush;
             continue;
         }
         if (c < 0x20 || c == 0x7f) continue;
@@ -172,7 +243,8 @@ Line Terminal::console_line(std::string& output, size_t limit, bool secret) cons
             continue;
         }
         storage.data[size++] = c;
-        if (!secret && interactive())
+        browsing = false;
+        if (echo)
         {
             DWORD written{};
             WriteConsoleW(output_, &c, 1, &written, nullptr);

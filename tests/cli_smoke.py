@@ -67,6 +67,8 @@ def start_server(server, root, password):
     config.write_text(json.dumps(dict(data_dir="data", log_dir="logs", temp_dir="tmp", tls_certificate="server.pem",
                                       tls_private_key="server.key", port=0, timeout_ms=10000)), encoding="utf-8")
     command = [server, "--config", str(config)]
+    storage = run([*command, "--initialize-storage"], cwd=root)
+    require(storage.returncode == 0, "storage initialization failed")
     initialized = run([*command, "--bootstrap-admin", "local-admin"], cwd=root, input=(password + "\n") * 2)
     require(initialized.returncode == 0, "bootstrap failed")
     with process(command, root) as instance:
@@ -108,6 +110,10 @@ def main():
         client.mkdir()
         cli = str(shutil.copy2(args.cli, client))
         shutil.copy2(args.dll, client)
+        absent = "StarDataParadiseCliTest" + secrets.token_hex(8)
+        service = run([cli, "--format", "json", "--command", "\\service status " + absent], cwd=client)
+        require(service.returncode == 2 and json.loads(service.stdout)["exit_code"] == 2
+                and "service not installed" in service.stderr, "local SCM did not report missing service")
 
         certificate(str(args.openssl), root, "server")
         certificate(str(args.openssl), root, "other")
@@ -128,7 +134,7 @@ def main():
                     "machine output contained diagnostics or ANSI")
             decoded = json.loads(machine.stdout)
             require(decoded["connected"] and decoded["port"] == port and decoded["code"] == 0
-                    and decoded["capabilities"]["health"] and not decoded["capabilities"]["sql"],
+                    and decoded["capabilities"]["health"] and decoded["capabilities"]["sql_crud_v1"],
                     "unexpected machine status")
             secret_clear(machine, password)
 
@@ -153,33 +159,63 @@ def main():
             require(rejected.returncode == 2 and not rejected.stdout, "secret-bearing profile was accepted")
             secret_clear(rejected, wrong)
 
-            session = run(command, cwd=client, input=password + "\n\\capabilities\n\\quit\n")
-            require(session.returncode == 0 and "sql unavailable" in session.stdout and "health available" in session.stdout
-                    and "\\help" not in session.stdout and "\x1b" not in session.stdout and not session.stderr,
+            pipe = [*command, "--format", "ndjson"]
+            session = run(pipe, cwd=client, input=password + "\n\\capabilities\n\\quit\n")
+            events = [json.loads(line) for line in session.stdout.splitlines()]
+            require(session.returncode == 0 and len(events) == 2 and events[0]["type"] == "capabilities"
+                    and events[0]["data"]["sql_crud_v1"] and events[0]["data"]["health"]
+                    and events[1]["data"]["exit_code"] == 0 and "\x1b" not in session.stdout and not session.stderr,
                     "normal pipe session contained a prompt, banner or wrong capability")
-            sql = run(command, cwd=client, input=password + "\nSELECT 1\n")
-            require(sql.returncode == 5 and "SQL is unavailable" in sql.stderr and "SELECT" not in sql.stdout,
-                    "SQL did not preserve the unavailable status at EOF")
+            sql = run(pipe, cwd=client, input=password + "\nSELECT 1\n")
+            batches = [event["data"] for line in sql.stdout.splitlines()
+                       if (event := json.loads(line))["type"] == "batch"]
+            require(sql.returncode == 0 and len(batches) == 1 and batches[0]["rows"] == [[{"t": "i64", "v": "1"}]],
+                    "SQL did not execute at EOF")
 
-            with process(command, client, with_console=True) as cli_process:
-                cli_process.stdin.write(password + "\n")
+            def query(sql, *options):
+                return run([*command, "--command", sql, *options], cwd=client, input=password + "\n")
+
+            require(query("CREATE TABLE cli_smoke_rows (id BIGINT PRIMARY KEY, note TEXT)").returncode == 0,
+                    "bind fixture table failed")
+            value = "İstanbul'; -- preserved"
+            binding = "note=" + json.dumps({"t": "text", "v": value}, ensure_ascii=False)
+            require(query("INSERT INTO cli_smoke_rows VALUES (1,:note)", "--bind", binding).returncode == 0,
+                    "CLI typed binding failed")
+            receipt = query("SELECT note FROM cli_smoke_rows", "--format", "json", "--color", "always")
+            records = json.loads(receipt.stdout)["events"]
+            require(receipt.returncode == 0 and "\x1b" not in receipt.stdout
+                    and next(event["data"]["rows"] for event in records if event["type"] == "batch")
+                    == [[{"t": "text", "v": value}]], "CLI bound text round trip")
+
+            rejected_tx = query(
+                "INSERT INTO cli_smoke_rows VALUES (2,'will roll back'); SELECT missing FROM cli_smoke_rows;",
+                "--transaction", "single", "--stop-on-error",
+            )
+            require(rejected_tx.returncode == 5, "atomic script did not report its SQL error")
+            readback = query("SELECT id FROM cli_smoke_rows ORDER BY id", "--format", "json")
+            data = json.loads(readback.stdout)["events"]
+            require(next(event["data"]["rows"] for event in data if event["type"] == "batch")
+                    == [[{"t": "i64", "v": "1"}]], "atomic script did not roll back")
+
+            with process(pipe, client, with_console=True) as cli_process:
+                cli_process.stdin.write(password + "\n\\status\n")
                 cli_process.stdin.flush()
-                require(readline(cli_process).startswith("Connected"), "Ctrl+C fixture did not connect")
+                require(json.loads(readline(cli_process))["data"]["connected"], "Ctrl+C fixture did not connect")
                 ctrl_c(cli_process.pid)
                 cli_process.communicate(timeout=6)
                 require(cli_process.returncode == 6, "Ctrl+C failed to close the client")
 
-            with process(command, client) as cli_process:
-                cli_process.stdin.write(password + "\n")
+            with process(pipe, client) as cli_process:
+                cli_process.stdin.write(password + "\n\\status\n")
                 cli_process.stdin.flush()
-                require(readline(cli_process).startswith("Connected"), "connection-loss fixture did not connect")
+                require(json.loads(readline(cli_process))["data"]["connected"], "connection-loss fixture did not connect")
                 server.kill()
                 server.wait(timeout=6)
                 _, errors = cli_process.communicate("\\status\n", timeout=8)
                 require(cli_process.returncode == 4 and "SDP 1010" in errors, "connection loss was not reported")
 
         require(not (client / "StarDataParadiseServer.exe").exists(), "client fixture included the Server EXE")
-    print("isolated TLS, DNS, profile, JSON, color, rejection, SQL unavailable, Ctrl+C, EOF and connection-loss passed")
+    print("isolated TLS, DNS, profile, JSON, color, rejection, SQL at EOF, Ctrl+C and connection loss passed")
 
 
 if __name__ == "__main__":

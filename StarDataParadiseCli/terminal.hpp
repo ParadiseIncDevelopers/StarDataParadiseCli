@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace cli
 {
@@ -32,12 +33,14 @@ public:
     HANDLE interrupt() const noexcept { return interrupt_; }
     bool interrupted() const noexcept;
     void set_color(Color mode, bool json);
-    void prompt(bool connected) const;
+    void quiet_input(bool quiet) { quiet_input_ = quiet; }
+    void prompt(bool connected, std::string_view detail) const;
     void success(std::string_view message) const;
-    Line line(std::string& output, size_t limit, bool secret = false) const;
+    Line line(std::string& output, size_t limit, bool secret = false,
+        const std::vector<std::string>* history = nullptr) const;
 
 private:
-    Line console_line(std::string& output, size_t limit, bool secret) const;
+    Line console_line(std::string& output, size_t limit, bool secret, const std::vector<std::string>* history) const;
     Line redirected_line(std::string& output, size_t limit) const;
 
     HANDLE input_;
@@ -48,5 +51,6 @@ private:
     bool console_input_{};
     bool console_output_{};
     bool color_{};
+    bool quiet_input_{};
 };
 }

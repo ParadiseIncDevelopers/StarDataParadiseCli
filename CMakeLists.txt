@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
-project(StarDataParadiseCLI VERSION 0.1.0 LANGUAGES CXX)
+project(StarDataParadiseCLI VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,11 +22,14 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 add_executable(StarDataParadiseCLI
     StarDataParadiseCli/StarDataParadiseCli.cpp
+    StarDataParadiseCli/automation.cpp
+    StarDataParadiseCli/output.cpp
     StarDataParadiseCli/terminal.cpp
-    StarDataParadiseCli/connection.cpp)
+    StarDataParadiseCli/connection.cpp
+    automation/sql_script.cpp)
 target_compile_definitions(StarDataParadiseCLI PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
 target_link_libraries(StarDataParadiseCLI PRIVATE
-    StarDataParadise::StarDataParadiseDLLler nlohmann_json::nlohmann_json ws2_32)
+    StarDataParadise::StarDataParadiseDLLler nlohmann_json::nlohmann_json ws2_32 bcrypt advapi32)
 add_custom_command(TARGET StarDataParadiseCLI POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
         "$<TARGET_FILE:StarDataParadise::StarDataParadiseDLLler>" "$<TARGET_FILE_DIR:StarDataParadiseCLI>"
@@ -36,9 +39,11 @@ if(BUILD_TESTING)
     add_test(NAME help COMMAND StarDataParadiseCLI --help)
     set_tests_properties(help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: StarDataParadiseCLI")
     add_test(NAME version COMMAND StarDataParadiseCLI --version)
-    set_tests_properties(version PROPERTIES PASS_REGULAR_EXPRESSION "^StarDataParadiseCLI 0[.]1[.]0")
+    set_tests_properties(version PROPERTIES PASS_REGULAR_EXPRESSION "^StarDataParadiseCLI 0[.]2[.]0")
     add_test(NAME invalid_option COMMAND ${CMAKE_COMMAND}
         "-DPROGRAM=$<TARGET_FILE:StarDataParadiseCLI>" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/invalid_option.cmake")
+    add_executable(sdp_cli_script_test tests/sql_script.cpp automation/sql_script.cpp)
+    add_test(NAME sql_script COMMAND sdp_cli_script_test)
 
     set(SDP_TEST_SERVER "" CACHE FILEPATH "Server EXE for CLI TLS integration")
     set(SDP_TEST_OPENSSL "" CACHE FILEPATH "OpenSSL tool for local test certificates")
@@ -51,5 +56,15 @@ if(BUILD_TESTING)
             --cli "$<TARGET_FILE:StarDataParadiseCLI>" --dll "$<TARGET_FILE:StarDataParadise::StarDataParadiseDLLler>"
             --server "${SDP_TEST_SERVER}" --openssl "${SDP_TEST_OPENSSL}" --scratch "${CMAKE_CURRENT_BINARY_DIR}/instances")
         set_tests_properties(cli_tls PROPERTIES TIMEOUT 90)
+        add_test(NAME cli_json_contract COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_json_contract.py"
+            --cli "$<TARGET_FILE:StarDataParadiseCLI>" --dll "$<TARGET_FILE:StarDataParadise::StarDataParadiseDLLler>"
+            --server "${SDP_TEST_SERVER}" --openssl "${SDP_TEST_OPENSSL}"
+            --scratch "${CMAKE_CURRENT_BINARY_DIR}/json-contract")
+        set_tests_properties(cli_json_contract PROPERTIES TIMEOUT 150)
+        add_test(NAME cli_management COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_management.py"
+            --cli "$<TARGET_FILE:StarDataParadiseCLI>" --dll "$<TARGET_FILE:StarDataParadise::StarDataParadiseDLLler>"
+            --server "${SDP_TEST_SERVER}" --openssl "${SDP_TEST_OPENSSL}"
+            --scratch "${CMAKE_CURRENT_BINARY_DIR}/management")
+        set_tests_properties(cli_management PROPERTIES TIMEOUT 180)
     endif()
 endif()
