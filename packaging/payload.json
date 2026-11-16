@@ -1,0 +1,41 @@
+{
+  "id": "cli",
+  "name": "StarDataParadise CLI (Development)",
+  "version": "0.2.0",
+  "scope": "perUser",
+  "directory": "CLI",
+  "features": [
+    {
+      "id": "Core",
+      "title": "Command-line client",
+      "component": "cli.core",
+      "dataOwner": "user",
+      "nativeRuntime": true,
+      "files": [
+        [
+          "release",
+          "StarDataParadiseCLI.exe",
+          "StarDataParadiseCLI.exe"
+        ],
+        [
+          "licenses",
+          "THIRD-PARTY.md",
+          "docs/THIRD-PARTY.md"
+        ]
+      ]
+    },
+    {
+      "id": "Docs",
+      "title": "Command-line examples",
+      "component": "cli.docs",
+      "dataOwner": "none",
+      "files": [
+        [
+          "repo",
+          "CLI.md",
+          "docs/CLI.md"
+        ]
+      ]
+    }
+  ]
+}
