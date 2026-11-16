@@ -8,6 +8,8 @@
 
 `--profile FILE` UTF-8 JSON okur. Desteklenen alanlar `host`, `port`, `user`, `ca_file`, `tls_name`, `timeout_ms` ve `production`. Göreli CA yolu profil dizininden çözülür. Komut satırı seçenekleri profili geçersiz kılabilir. `--prod` veya profildeki `production: true`, terminal oturumunda `PROD` etiketi gösterir. Parola konsolda yankısız okunur. `--password-stdin` ile ilk UTF-8 satır parola olarak kullanılır. Profil ve seçenekler parola alanı kabul etmez.
 
+Güncelleme durumunu işleyen ortak araç bir yerel JSON kaydı oluşturur. `StarDataParadiseCLI --update-status FILE` bu kaydı salt okunur açar ve bileşen, önceki ve hedef sürüm, geçerli ve bekleyen adım, geri dönüş sınırı ve yönetici gereksinimini JSON olarak gösterir. Komut bağlantı profili olmadan kullanılabilir.
+
 ## Etkileşim ve işlem
 
 - SQL ifadesini noktalı virgülle bitir. Alıntı, yorum ve PL/SQL blokları çok satırlı giriş olarak işlenir. Terminal istemi `main.public` bağlamını, oturum kimliğini, transaction durumunu ve `DEV` veya `PROD` profil etiketini gösterir.

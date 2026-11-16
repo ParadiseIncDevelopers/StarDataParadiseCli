@@ -1,11 +1,14 @@
 #include "automation.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <fstream>
 #include <iostream>
 #include <optional>
 #include <sstream>
+
+#include <windows.h>
 
 namespace
 {
@@ -34,6 +37,7 @@ struct Arguments
 void help(std::ostream& out = std::cout)
 {
     out << "Usage: StarDataParadiseCLI [--help | --version]\n"
+           "       StarDataParadiseCLI --update-status FILE\n"
            "       StarDataParadiseCLI [--profile FILE] [--host HOST] [--port N] [--user USER]\n"
            "          [--ca PEM] [--tls-name NAME] [--timeout-ms N] [--password-stdin] [--prod]\n"
            "          [--status | --json] [--color auto|always|never]\n"
@@ -45,6 +49,72 @@ void help(std::ostream& out = std::cout)
            "          \\release NAME, \\outcome TOKEN, \\sessions, \\password [USER],\n"
            "          \\service ACTION NAME, \\help, \\quit\n"
            "RPC groups: sessions, history, decision, job, dataset, model, backup, admin\n";
+}
+
+bool journal_token(std::string_view text, std::string_view punctuation)
+{
+    const auto alphanumeric = [](char value) {
+        return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') ||
+            (value >= '0' && value <= '9');
+    };
+    return !text.empty() && text.size() <= 64 && alphanumeric(text.front()) &&
+        std::ranges::all_of(text, [&](char value) { return alphanumeric(value) || punctuation.find(value) != punctuation.npos; });
+}
+
+Json read_update_status(const std::filesystem::path& file)
+{
+    std::error_code error;
+    const auto path = std::filesystem::absolute(file, error);
+    const auto& name = path.native();
+    if (error || name.size() < 4 || name[1] != L':' ||
+        (name[2] != L'\\' && name[2] != L'/') || name.find(L':', 2) != name.npos)
+        throw std::invalid_argument("Choose a regular file on a local drive");
+    const wchar_t root[] = { name[0], L':', L'\\', L'\0' };
+    const auto drive = GetDriveTypeW(root);
+    if (drive != DRIVE_FIXED && drive != DRIVE_REMOVABLE && drive != DRIVE_RAMDISK && drive != DRIVE_CDROM)
+        throw std::invalid_argument("Choose a regular file on a local drive");
+    const auto attributes = GetFileAttributesW(path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES ||
+        (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_DEVICE)) != 0)
+        throw std::invalid_argument("Choose a regular file on a local drive");
+    std::ifstream input(path, std::ios::binary);
+    std::array<char, 64 * 1024 + 1> bytes{};
+    if (!input || !input.read(bytes.data(), static_cast<std::streamsize>(bytes.size())).eof() || input.bad())
+        throw std::invalid_argument("The update status file could not be read within 64 KiB");
+    const auto source = Json::parse(bytes.begin(), bytes.begin() + input.gcount(), nullptr, false);
+    const auto valid_phase = [](const std::string& phase) {
+        constexpr std::array<std::string_view, 11> names{
+            "planned", "verified", "preflight", "stopped", "staging", "staged", "verified_target",
+            "started", "complete", "safe_stop", "rolled_back"};
+        return std::ranges::find(names, std::string_view(phase)) != names.end();
+    };
+    if (!source.is_object() || !source.contains("schema") || source["schema"] != 1)
+        throw std::invalid_argument("Invalid or unsupported update status");
+
+    const auto field = [&](const char* key) -> std::string {
+        return source.contains(key) && source[key].is_string() ? source[key].get<std::string>() : "";
+    };
+    const auto component = field("component");
+    const auto from = field("from_version");
+    const auto to = field("to_version");
+    const auto phase = field("phase");
+    const auto pending = field("pending");
+    const auto boundary = field("rollback_boundary");
+    const auto instance = field("instance");
+    if ((component != "server" && component != "workbench" && component != "cli") ||
+        !journal_token(from, ".+_-") || !journal_token(to, ".+_-") || !valid_phase(phase) ||
+        (source.contains("pending") && !source["pending"].is_null() && !valid_phase(pending)) ||
+        (boundary != "source_preserved" && boundary != "has_new_writes" &&
+         boundary != "rollback_complete" && boundary != "unknown") ||
+        !source.contains("requires_admin") || !source["requires_admin"].is_boolean() ||
+        (source.contains("instance") && !source["instance"].is_null() && !journal_token(instance, "_.-")))
+        throw std::invalid_argument("Invalid or unsupported update status");
+    Json result{
+        {"schema", 1}, {"component", component}, {"from_version", from}, {"to_version", to}, {"phase", phase},
+        {"pending", pending.empty() ? Json(nullptr) : Json(pending)},
+        {"rollback_boundary", boundary}, {"requires_admin", source["requires_admin"]}};
+    if (!instance.empty()) result["instance"] = instance;
+    return result;
 }
 
 Color color_mode(std::string_view value)
@@ -605,6 +675,12 @@ int wmain(int argc, wchar_t** argv)
         if (argc == 2 && std::wstring_view(argv[1]) == L"--version")
         {
             std::cout << "StarDataParadiseCLI 0.2.0\n";
+            return 0;
+        }
+        if (argc >= 2 && std::wstring_view(argv[1]) == L"--update-status")
+        {
+            if (argc != 3) throw std::invalid_argument("Use --update-status FILE");
+            std::cout << read_update_status(argv[2]).dump() << '\n';
             return 0;
         }
         auto args = arguments(argc, argv);

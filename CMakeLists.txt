@@ -42,6 +42,10 @@ if(BUILD_TESTING)
     set_tests_properties(version PROPERTIES PASS_REGULAR_EXPRESSION "^StarDataParadiseCLI 0[.]2[.]0")
     add_test(NAME invalid_option COMMAND ${CMAKE_COMMAND}
         "-DPROGRAM=$<TARGET_FILE:StarDataParadiseCLI>" -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/invalid_option.cmake")
+    add_test(NAME cli_update_status COMMAND ${CMAKE_COMMAND}
+        "-DPROGRAM=$<TARGET_FILE:StarDataParadiseCLI>"
+        "-DFIXTURE=${CMAKE_CURRENT_BINARY_DIR}/update-status-fixture.json"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/update_status.cmake")
     add_executable(sdp_cli_script_test tests/sql_script.cpp automation/sql_script.cpp)
     add_test(NAME sql_script COMMAND sdp_cli_script_test)
 
