@@ -1,0 +1,226 @@
+diff --git a/cmake/protobuf.cmake b/cmake/protobuf.cmake
+index 4fc194b2236e8c7b9186600af8bcce12dbc505d3..8cdee143e3c3cc7d4c119a47f3755da1c4ed56a5 100644
+--- a/cmake/protobuf.cmake
++++ b/cmake/protobuf.cmake
+@@ -157,5 +157,12 @@ IF(NOT WITH_PROTOBUF)
+   ENDIF()
+ ENDIF()
+ 
++SET(MYSQLSH_USE_BUNDLED_PROTOBUF_DLLS OFF)
++IF(WIN32 AND NOT WITH_PROTOBUF)
++  SET(MYSQLSH_USE_BUNDLED_PROTOBUF_DLLS ON)
++ENDIF()
++CONFIGURE_FILE("${CMAKE_CURRENT_LIST_DIR}/protobuf_config.h.in"
++               "${CMAKE_BINARY_DIR}/mysqlsh_protobuf_config.h")
++
+ MESSAGE("PROTOBUF_INCLUDE_DIRS: ${PROTOBUF_INCLUDE_DIRS}")
+ MESSAGE("PROTOBUF_LIBRARIES: ${PROTOBUF_LIBRARIES}")
+diff --git a/cmake/protobuf_config.h.in b/cmake/protobuf_config.h.in
+new file mode 100644
+index 0000000000000000000000000000000000000000..7c2bca6dd5929bff7948795f2fd0f6ad5ffc6522
+--- /dev/null
++++ b/cmake/protobuf_config.h.in
+@@ -0,0 +1,15 @@
++#ifndef MYSQLSH_PROTOBUF_CONFIG_H_
++#define MYSQLSH_PROTOBUF_CONFIG_H_
++
++#cmakedefine01 MYSQLSH_USE_BUNDLED_PROTOBUF_DLLS
++
++#if MYSQLSH_USE_BUNDLED_PROTOBUF_DLLS
++#ifndef PROTOBUF_USE_DLLS
++#define PROTOBUF_USE_DLLS
++#endif
++#ifndef ABSL_CONSUME_DLL
++#define ABSL_CONSUME_DLL
++#endif
++#endif
++
++#endif  // MYSQLSH_PROTOBUF_CONFIG_H_
+diff --git a/mysqlshdk/libs/db/mysqlx/mysqlxclient_clean.h b/mysqlshdk/libs/db/mysqlx/mysqlxclient_clean.h
+index 6a33c352f6097516cfceea01a91cfbdaa6ecd38f..3a4d107c2ce18d7bccfa9fe1f99d9c33d0d04c2d 100644
+--- a/mysqlshdk/libs/db/mysqlx/mysqlxclient_clean.h
++++ b/mysqlshdk/libs/db/mysqlx/mysqlxclient_clean.h
+@@ -51,6 +51,7 @@
+ #undef ERROR
+ #endif
+ 
++#include "mysqlsh_protobuf_config.h"
+ #include <mysqlxmessages_export.h>
+ 
+ #include <mysqlxclient.h>
+diff --git a/res/resource.rc.in b/res/resource.rc.in
+index 7a2fbd1b90633a99d6e3f57d3527c3891b51c767..7ffc672aec55d621ff59db3d2d64f53fd5d37961 100644
+--- a/res/resource.rc.in
++++ b/res/resource.rc.in
+@@ -87,7 +87,7 @@ BEGIN
+             VALUE "LegalCopyright",   "Copyright © 2016, @PACKAGE_YEAR@, Oracle and/or its affiliates.\0"
+             VALUE "LegalTrademarks",  "Oracle®, Java, MySQL, and NetSuite are registered trademarks of Oracle and/or its affiliates.\0"
+             VALUE "OriginalFilename", "@MYSH_ORIGINAL_FILE_NAME@\0"
+-            VALUE "ProductName",      "MySQL Shell\0"
++            VALUE "ProductName",      "StarDataParadise CLI\0"
+             VALUE "ProductVersion",   "@MAJOR_VERSION@.@MINOR_VERSION@.@PATCH_VERSION@.0\0"
+             VALUE "FileVersion",      "@MAJOR_VERSION@.@MINOR_VERSION@.@PATCH_VERSION@.0\0"
+         END
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 9dba8bc18f2937fcf195272769646fd7106f25b6..abf4e9fcbd6bda7df402ea0616007287e305e673 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -78,7 +78,7 @@ if(WIN32)
+   # - Define the icon to be used on the application.
+   # - Define the version information to be shown while looking at the file
+   # properties.
+-  generate_rc_file(NAME "mysqlsh.exe" DESCRIPTION "Advanced client and code editor for MySQL." OUT_RC_FILE RC_FILE)
++  generate_rc_file(NAME "mysqlsh.exe" DESCRIPTION "StarDataParadise command line client and scripting environment." OUT_RC_FILE RC_FILE)
+   set(mysqlsh_SRC
+       "${mysqlsh_SRC}"
+       "${RC_FILE}"
+diff --git a/src/mysqlsh/cmdline_shell.cc b/src/mysqlsh/cmdline_shell.cc
+index 5858097bbf44ed353f0ae9029563cbfebe9f6ec2..975db2e241da6b96b268893da52337090b9cdba1 100644
+--- a/src/mysqlsh/cmdline_shell.cc
++++ b/src/mysqlsh/cmdline_shell.cc
+@@ -1191,7 +1191,7 @@ void Command_line_shell::command_loop() {
+ }
+ 
+ void Command_line_shell::print_banner() {
+-  std::string welcome_msg("MySQL Shell ");
++  std::string welcome_msg("StarDataParadise CLI ");
+   welcome_msg += mysqlshdk::utils::k_shell_version.get_full();
+   welcome_msg += "\n\n";
+   welcome_msg += "Copyright (c) 2016, " PACKAGE_YEAR
+@@ -1206,7 +1206,7 @@ void Command_line_shell::print_banner() {
+ 
+ void Command_line_shell::print_cmd_line_helper() {
+   // clang-format off
+-  std::string help_msg("MySQL Shell ");
++  std::string help_msg("StarDataParadise CLI ");
+   help_msg += mysqlshdk::utils::k_shell_version.get_full();
+   println(help_msg);
+   println("");
+diff --git a/src/mysqlsh/mysql_shell.cc b/src/mysqlsh/mysql_shell.cc
+index 3b9537879dd2ce7a09005077045e96c7b71405a9..add03a3fd48e7c122f7249da32419485a4e64459 100644
+--- a/src/mysqlsh/mysql_shell.cc
++++ b/src/mysqlsh/mysql_shell.cc
+@@ -465,6 +465,17 @@ REGISTER_HELP(CMD_STATUS_BRIEF,
+ REGISTER_HELP(CMD_STATUS_SYNTAX, "<b>\\status</b>");
+ REGISTER_HELP(CMD_STATUS_SYNTAX1, "<b>\\s</b>");
+ 
++REGISTER_HELP(CMD_SDP_CAPABILITIES_BRIEF,
++              "Print the current StarDataParadise server capabilities.");
++REGISTER_HELP(CMD_SDP_CAPABILITIES_SYNTAX, "<b>\\capabilities</b>");
++
++REGISTER_HELP(CMD_SDP_DATABASES_BRIEF, "List visible databases.");
++REGISTER_HELP(CMD_SDP_DATABASES_SYNTAX, "<b>\\databases</b>");
++
++REGISTER_HELP(CMD_SDP_TABLES_BRIEF,
++              "List visible tables and views across databases.");
++REGISTER_HELP(CMD_SDP_TABLES_SYNTAX, "<b>\\tables</b>");
++
+ REGISTER_HELP(CMD_WARNINGS_BRIEF, "Show warnings after every statement.");
+ REGISTER_HELP(CMD_WARNINGS_SYNTAX, "<b>\\warnings</b>");
+ REGISTER_HELP(CMD_WARNINGS_SYNTAX1, "<b>\\W</b>");
+@@ -722,6 +733,12 @@ Mysql_shell::Mysql_shell(const std::shared_ptr<Shell_options> &cmdline_options,
+                            std::bind(&Mysql_shell::cmd_nowarnings, this, _1),
+                            true, global_command);
+   SET_SHELL_COMMAND("\\status|\\s", "CMD_STATUS", Mysql_shell::cmd_status);
++  SET_SHELL_COMMAND("\\capabilities", "CMD_SDP_CAPABILITIES",
++                    Mysql_shell::cmd_sdp_capabilities);
++  SET_SHELL_COMMAND("\\databases", "CMD_SDP_DATABASES",
++                    Mysql_shell::cmd_sdp_metadata);
++  SET_SHELL_COMMAND("\\tables", "CMD_SDP_TABLES",
++                    Mysql_shell::cmd_sdp_metadata);
+   SET_CUSTOM_SHELL_COMMAND("\\use|\\u", "CMD_USE",
+                            std::bind(&Mysql_shell::cmd_use, this, _1), true,
+                            shcore::IShell_core::Mode_mask::all(), false);
+@@ -1544,7 +1561,7 @@ bool Mysql_shell::cmd_nowarnings(
+ 
+ bool Mysql_shell::cmd_status(
+     [[maybe_unused]] const std::vector<std::string> &args) {
+-  std::string version_msg("MySQL Shell version ");
++  std::string version_msg("StarDataParadise CLI version ");
+   version_msg += mysqlshdk::utils::k_shell_version.get_full();
+   version_msg += "\n";
+   println(version_msg);
+@@ -1696,6 +1713,52 @@ bool Mysql_shell::cmd_status(
+   return true;
+ }
+ 
++bool Mysql_shell::cmd_sdp_capabilities(const std::vector<std::string> &args) {
++  if (args.size() != 1) {
++    print_diag("Usage: \\capabilities");
++    return true;
++  }
++  const auto session = _shell->get_dev_session();
++  if (!session || !session->is_open()) {
++    print_diag("Not connected.");
++    return true;
++  }
++  try {
++    const auto result = session->get_core_session()->query(
++        "SELECT STARDATAPARADISE_CAPABILITIES()");
++    println(result->fetch_one_or_throw()->get_string(0));
++  } catch (const mysqlshdk::db::Error &e) {
++    print_diag(
++        shcore::Exception::mysql_error_with_code(e.what(), e.code()).format());
++  }
++  return true;
++}
++
++bool Mysql_shell::cmd_sdp_metadata(const std::vector<std::string> &args) {
++  if (args.size() != 1) {
++    print_diag("Usage: \\databases or \\tables (no arguments).");
++    return true;
++  }
++  const auto session = _shell->get_dev_session();
++  if (!session || !session->is_open()) {
++    print_diag("Not connected.");
++    return true;
++  }
++
++  const char *query = shcore::str_strip(args.front()) == "\\databases"
++                          ? "SHOW DATABASES"
++                          : "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE "
++                            "FROM INFORMATION_SCHEMA.TABLES "
++                            "ORDER BY TABLE_SCHEMA, TABLE_NAME";
++  try {
++    process_sql_result(session->get_core_session()->query(query), {});
++  } catch (const mysqlshdk::db::Error &e) {
++    print_diag(
++        shcore::Exception::mysql_error_with_code(e.what(), e.code()).format());
++  }
++  return true;
++}
++
+ bool Mysql_shell::cmd_use(const std::vector<std::string> &args) {
+   std::string error;
+   if (_shell->get_dev_session() && _shell->get_dev_session()->is_open()) {
+diff --git a/src/mysqlsh/mysql_shell.h b/src/mysqlsh/mysql_shell.h
+index 2de802483345adad0bce2baf61055d579577a012..48a6c249af613d72647cb36ca0f7e25fc8953776 100644
+--- a/src/mysqlsh/mysql_shell.h
++++ b/src/mysqlsh/mysql_shell.h
+@@ -72,6 +72,8 @@ class Mysql_shell : public mysqlsh::Base_shell {
+   bool cmd_warnings(const std::vector<std::string> &args);
+   bool cmd_nowarnings(const std::vector<std::string> &args);
+   bool cmd_status(const std::vector<std::string> &args);
++  bool cmd_sdp_capabilities(const std::vector<std::string> &args);
++  bool cmd_sdp_metadata(const std::vector<std::string> &args);
+   bool cmd_use(const std::vector<std::string> &args);
+   bool cmd_rehash(const std::vector<std::string> &args);
+   bool cmd_option(const std::vector<std::string> &args);
+diff --git a/unittest/scripts/auto/js_shell/scripts/misc_bugfixes_norecord.js b/unittest/scripts/auto/js_shell/scripts/misc_bugfixes_norecord.js
+index dc71bb22917562389d4b01fd8342ffc6fd079c32..cac5ba5401e1ff47bb0d96dadd4f0e52ea695936 100644
+--- a/unittest/scripts/auto/js_shell/scripts/misc_bugfixes_norecord.js
++++ b/unittest/scripts/auto/js_shell/scripts/misc_bugfixes_norecord.js
+@@ -123,11 +123,11 @@ session.close();
+ //@<> MY-495 STATUS BEHAVES DIFFERENTLY WHEN CONNECTION IS LOST
+ shell.connect(__uripwd);
+ \status
+-EXPECT_OUTPUT_CONTAINS("MySQL Shell version");
++EXPECT_OUTPUT_CONTAINS("StarDataParadise CLI version");
+ EXPECT_THROWS(function() {session.runSql('kill connection_id()')}, "Query execution was interrupted");
+ 
+ \status
+-EXPECT_OUTPUT_CONTAINS("MySQL Shell version");
++EXPECT_OUTPUT_CONTAINS("StarDataParadise CLI version");
+ EXPECT_OUTPUT_CONTAINS("MySQL server has gone away");
+ 
+ session.close();
