@@ -51,3 +51,13 @@ Yamalı Shell `--mysql` ile Classic TCP kullanır ve JavaScript ile Python kiple
 ```
 
 [Shell kaynak önizlemesi](compatibility/upstream/README.md) · [MySQL tabanlı Server uyumluluk kılavuzu](https://github.com/ParadiseIncDevelopers/StarDataParadiseServer/tree/master/compatibility) · [Sürüm notları](https://github.com/ParadiseIncDevelopers/StarDataParadiseCli/releases)
+
+## Lisans
+
+Özgün wire v1 CLI, [CLI Free-Use License 1.0](licenses/StarDataParadise-CLI-Free-Use.txt)
+ile değiştirilmeyen resmî ikililer için ücretsiz kişisel ve ticari kullanım
+sunar; bu lisans kaynak koduna genel değiştirme ve yeniden dağıtım izni vermez.
+
+MySQL Shell tabanlı Classic CLI ve [upstream yaması](compatibility/upstream/)
+GPLv2 ile upstream ek izinlerini korur. Ayrıntılar:
+[LICENSE](LICENSE) · [Lisans kapsamı](LICENSING.md).

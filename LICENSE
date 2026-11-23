@@ -1,0 +1,32 @@
+StarDataParadise CLI — license scope
+
+This repository contains separately licensed command-line implementations.
+
+1. The independently authored StarDataParadise wire v1 CLI in
+   StarDataParadiseCli/ and its original supporting code/documentation,
+   except for separately licensed material, is governed by
+   licenses/StarDataParadise-CLI-Free-Use.txt.
+   This is a proprietary, no-cost binary-use license, not an open-source
+   license. Public source visibility does not grant source reuse rights.
+
+2. compatibility/upstream/ contains the MySQL Shell source patch and
+   related integration. MySQL-derived material retains GNU GPL version 2,
+   upstream additional permissions and third-party notices. Original
+   StarDataParadise contributions in this designated integration scope
+   are licensed under GPL version 2 (licenses/GPL-2.0-only.txt).
+   The pinned upstream license and notices are copied unchanged to
+   compatibility/upstream/LICENSE.mysql-shell.txt.
+   The Free-Use License never applies to MySQL Shell, these GPL-covered
+   sources or their covered derivative works.
+
+3. The Native SDK and other dependencies retain their own licenses.
+   File-specific licenses and copyright notices remain in effect.
+   No trademark or endorsement rights are granted by this scope notice.
+   Rights validly granted for earlier copies are not reduced.
+
+See LICENSING.md for details and redistribution requirements.
+
+Additional linking permission for copyright-controlled StarDataParadise
+contributions in the identified GPL scopes is granted in
+licenses/StarDataParadise-GPL-Linking-Exception.txt. It does not apply to
+unrelated proprietary code or change third-party rights.

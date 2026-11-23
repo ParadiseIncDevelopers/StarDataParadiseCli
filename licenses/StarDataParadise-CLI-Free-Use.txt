@@ -1,0 +1,88 @@
+StarDataParadise CLI Free-Use License, Version 1.0
+Effective date: 23 November 2026
+
+Copyright (c) 2026 Paradise Bilisim Tic. Ltd. Sti. (ParadiseIncDevelopers).
+All rights reserved except as expressly licensed below.
+
+1. Scope and definitions
+This license applies only to the independently authored StarDataParadise wire v1 command-line client
+(the "Application") made available by the copyright holder (the "Licensor")
+with this license. "Binary" means the unmodified, compiled Application
+supplied by the Licensor with this license.
+MySQL Shell, the compatibility/upstream/ patch and native MySQL Shell
+derivative works are excluded.
+Third-party components and material bearing a separate license are excluded.
+The repository's LICENSE and LICENSING.md identify these separate scopes.
+No provision of this license restricts rights independently granted under
+the GPL or another third-party license.
+
+2. No-cost permission to use and redistribute the Binary
+Subject to the conditions below, the Licensor grants you a worldwide,
+non-exclusive, royalty-free license to download, install, run, make
+reasonable backup copies of, and use the unmodified Binary for personal,
+educational, internal business and commercial purposes.
+You may redistribute the unmodified Binary, including with your own
+applications or to customers, at no separate Application license charge,
+provided that you preserve all copyright and attribution notices and
+include this complete license with every copy or distribution.
+You may charge for your own applications and services. This permission
+does not authorize selling the Application as a standalone proprietary
+product or claiming ownership of it.
+
+3. Source code and modifications
+This is a free-use Binary license, not an open-source license.
+Public source availability does not itself grant permission to modify,
+adapt, sublicense or redistribute the Application's implementation source
+or to distribute modified Application binaries. You may read the source
+made publicly available by the Licensor. Other source uses require a
+separate license, except where applicable law or independent permissions,
+including the hosting platform's terms, provide otherwise.
+You may use the Application's public interfaces to build integrations.
+Do not remove notices, falsely claim authorship or misrepresent origin.
+These restrictions do not apply to separately licensed GPL, LGPL or other
+third-party components. Rights to modify or reverse-engineer for debugging
+modifications to LGPL-covered libraries, where required by their licenses,
+are expressly preserved.
+
+4. Separate products and services
+This license does not grant access to separately licensed Enterprise
+features, Cloud services, support, service-level agreements, credentials
+or other products. Any such offering requires its own authorization.
+It does not limit rights already granted for separately licensed code.
+
+5. Trademarks and third-party components
+No trademark or endorsement rights are granted. Names and marks remain
+with their respective owners. Third-party software retains its own
+copyrights, license terms, notices and any applicable additional
+permissions. Include the required third-party notices when redistributing.
+This license cannot be used to impose additional restrictions on GPL
+or LGPL components or their covered derivative works.
+
+6. Warranty disclaimer
+THE APPLICATION IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES
+OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT, TO THE
+MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW. THIS SECTION DOES NOT
+EXCLUDE WARRANTIES THAT CANNOT LAWFULLY BE EXCLUDED.
+
+7. Liability
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSOR SHALL
+NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR
+PUNITIVE DAMAGES ARISING FROM USE OF THE APPLICATION, INCLUDING LOSS
+OF DATA, PROFITS OR BUSINESS. NOTHING EXCLUDES LIABILITY WHICH CANNOT
+LAWFULLY BE EXCLUDED OR LIMITED.
+
+8. Termination and prior versions
+The rights granted by this license end if you materially breach this
+license and do not remedy the breach within 30 days after receiving
+written notice. Upon termination, stop using and distributing copies
+for which no independent permission remains.
+Later license versions do not retroactively reduce rights validly
+granted for copies obtained under this or another applicable license.
+Provisions that by their nature must survive shall do so.
+
+9. Notices
+When redistributing the Binary, include this text in an accompanying
+conspicuous license file or in the application's legal notices.
+Requests for additional rights may be directed to the Licensor through
+the repository owner at https://github.com/ParadiseIncDevelopers.
